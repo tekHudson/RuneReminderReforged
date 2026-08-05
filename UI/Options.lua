@@ -122,23 +122,22 @@ local function BuildPage()
 	notifyCB:SetPoint("TOPLEFT", panel, "TOPLEFT", COL1, y)
 	y = y - ROW - 12
 
-	local alignDD = newDropdown(panel, "Alignment",
-		{ { text = "Horizontal", value = "HORIZONTAL" }, { text = "Vertical", value = "VERTICAL" } },
-		function() return RRR.db.widget.alignment end,
-		function(v) RRR:SetWidgetAlignment(v) end)
-	alignDD:PlaceAt(COL1 - 4, y)
-	y = y - 52
-
-	local flyoutDD = newDropdown(panel, "Flyout direction",
-		{
-			{ text = "Up", value = "UP" },
-			{ text = "Down", value = "DOWN" },
-			{ text = "Left", value = "LEFT" },
-			{ text = "Right", value = "RIGHT" },
-		},
-		function() return RRR.db.widget.flyoutDirection end,
-		function(v) RRR.db.widget.flyoutDirection = v end)
-	flyoutDD:PlaceAt(COL1 - 4, y)
+	local LAYOUT_CHOICES = {
+		{ text = "Vertical (flyout left)",   value = "VERTICAL_LEFT" },
+		{ text = "Vertical (flyout right)",  value = "VERTICAL_RIGHT" },
+		{ text = "Horizontal (flyout up)",   value = "HORIZONTAL_UP" },
+		{ text = "Horizontal (flyout down)", value = "HORIZONTAL_DOWN" },
+	}
+	local layoutDD = newDropdown(panel, "Layout", LAYOUT_CHOICES,
+		function()
+			return RRR.db.widget.alignment .. "_" .. RRR.db.widget.flyoutDirection
+		end,
+		function(v)
+			local alignment, direction = v:match("^(%a+)_(%a+)$")
+			RRR:SetWidgetAlignment(alignment)
+			RRR.db.widget.flyoutDirection = direction
+		end)
+	layoutDD:PlaceAt(COL1 - 4, y)
 	y = y - 52
 
 	local sizeSlider = newSlider(panel, "Size", 0.5, 2.0, 0.1,
