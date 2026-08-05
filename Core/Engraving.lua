@@ -115,8 +115,22 @@ function RRR:GetRunesForSlot(slot)
 	return runes
 end
 
-function RRR:CastRuneOnSlot(skillLineAbilityID)
+-- CastRune only selects the rune and enters "targeting mode" -- Blizzard's
+-- own EngravingFrameSpell_OnClick does nothing more than this either. The
+-- actual application to a specific slot happens when you then use/interact
+-- with that inventory slot (UseInventoryItem(paperdollSlot)); a native
+-- confirmation popup appears if it would overwrite an existing rune.
+-- Confirmed via a community macro: "/click <rune> /use <slot>" -- e.g. slot
+-- 5 for Chest, matching our own paperdoll slot numbering. Since the picker
+-- already knows exactly which slot was clicked, complete that targeting
+-- step automatically instead of requiring the player to separately click
+-- the item afterward -- the native overwrite confirmation still applies
+-- when relevant, so this doesn't bypass that safety check.
+function RRR:CastRuneOnSlot(skillLineAbilityID, slot)
 	C_Engraving.CastRune(skillLineAbilityID)
+	if slot then
+		UseInventoryItem(slot)
+	end
 end
 
 ----------------------------------------------------------------------

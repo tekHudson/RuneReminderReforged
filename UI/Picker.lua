@@ -77,7 +77,7 @@ function RRR:OpenPicker(slot, anchorButton)
 		b.icon:SetTexture(rune.iconTexture)
 		b.runeName = rune.name
 		b:SetScript("OnClick", function()
-			RRR:CastRuneOnSlot(rune.skillLineAbilityID)
+			RRR:CastRuneOnSlot(rune.skillLineAbilityID, slot)
 			HideFlyout()
 		end)
 		b:ClearAllPoints()

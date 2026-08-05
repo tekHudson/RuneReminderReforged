@@ -21,7 +21,7 @@ function RRR:RuneMismatch(slot, oldRune, newRune)
 		end
 	else
 		if oldRune then
-			RRR:Print(string.format("Your %s has no rune engraved (had |cffffcc00%s|r before).",
+			RRR:Print(string.format("Your %s has no rune engraved (had |cffffcc00%s|r before) -- click that slot on the widget to re-engrave it.",
 				slotName, oldRune.name))
 		else
 			RRR:Print(string.format("Your %s has no rune engraved.", slotName))
