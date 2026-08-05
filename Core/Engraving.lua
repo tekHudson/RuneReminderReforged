@@ -20,11 +20,21 @@ local RRR = ns.RRR
 ----------------------------------------------------------------------
 
 -- Ordered so the widget lays out buttons in the same order as the paperdoll.
+-- SoD's rune-engraving system covers exactly 9 slot categories: chest,
+-- gloves, legs, waist, feet, head, wrist, back, and ring (confirmed via
+-- Icy Veins' SoD rune overview -- "Notably absent... shoulder, neck, and
+-- trinket slots", and neither weapons nor tabard/shirt are armor). Ring
+-- covers both physical finger slots. C_Engraving.IsEquipmentSlotEngravable
+-- still gates each of these individually below, but it isn't reliable
+-- enough on its own to also decide which slot *categories* are worth
+-- probing in the first place: it returned true for INVSLOT_RANGED despite
+-- ranged weapons not actually being engravable, so anything outside this
+-- confirmed 9-category set is excluded here rather than trusted to
+-- self-report correctly.
 local ALL_SLOTS = {
-	INVSLOT_HEAD, INVSLOT_NECK, INVSLOT_SHOULDER, INVSLOT_BACK, INVSLOT_CHEST,
+	INVSLOT_HEAD, INVSLOT_BACK, INVSLOT_CHEST,
 	INVSLOT_WRIST, INVSLOT_HAND, INVSLOT_WAIST, INVSLOT_LEGS, INVSLOT_FEET,
-	INVSLOT_FINGER1, INVSLOT_FINGER2, INVSLOT_TRINKET1, INVSLOT_TRINKET2,
-	INVSLOT_MAINHAND, INVSLOT_OFFHAND, INVSLOT_RANGED, INVSLOT_TABARD, INVSLOT_BODY,
+	INVSLOT_FINGER1, INVSLOT_FINGER2,
 }
 
 local function RunesMatch(a, b)
