@@ -1,52 +1,90 @@
---[[ UI/Picker.lua — a single shared context-menu-style dropdown (Blizzard's
-native UIDropDownMenuTemplate, zero third-party libraries) listing the runes
-available for whichever slot button was clicked. Repopulated fresh on every
-open via RRR:GetRunesForSlot, so newly-learned runes always show up.
+--[[ UI/Picker.lua — a small flyout of bare icon buttons (matching the main
+widget's own look, see UI/Widget.lua) listing the runes available for
+whichever slot was clicked. No dropdown-menu chrome. Repopulated fresh on
+every open via RRR:GetRunesForSlot, so newly-learned runes always show up.
 ]]
 
 local ADDON, ns = ...
 local RRR = ns.RRR
 
-local menu
-local currentSlot
+local ICON_SIZE = 28
+local ICON_PADDING = 4
 
-local function InitializePicker(_, level)
-	-- UIDropDownMenu_Initialize invokes this once immediately during setup
-	-- (before any slot has ever been picked), not just lazily on open.
-	if not currentSlot then
-		return
-	end
+local flyout
+local flyoutButtons = {} -- reused pool, index = position in the current list
+local openForSlot -- nil when closed, else the slot the flyout is currently showing
 
-	local runes = RRR:GetRunesForSlot(currentSlot)
+local function HideFlyout()
+	openForSlot = nil
+	flyout:Hide()
+end
 
-	if #runes == 0 then
-		local info = UIDropDownMenu_CreateInfo()
-		info.text = "No runes known for this slot"
-		info.notCheckable = true
-		info.disabled = true
-		UIDropDownMenu_AddButton(info, level)
-		return
-	end
+local function CreateFlyoutButton()
+	local b = CreateFrame("Button", nil, flyout)
+	b:SetSize(ICON_SIZE, ICON_SIZE)
 
-	for _, rune in ipairs(runes) do
-		local info = UIDropDownMenu_CreateInfo()
-		info.text = rune.name
-		info.notCheckable = true
-		info.icon = rune.iconTexture
-		info.func = function()
-			RRR:CastRuneOnSlot(rune.skillLineAbilityID)
-			CloseDropDownMenus()
-		end
-		UIDropDownMenu_AddButton(info, level)
-	end
+	local border = b:CreateTexture(nil, "BACKGROUND")
+	border:SetAllPoints()
+	border:SetColorTexture(0, 0, 0, 0.5)
+
+	b.icon = b:CreateTexture(nil, "ARTWORK")
+	b.icon:SetPoint("TOPLEFT", 1, -1)
+	b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+	b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+	b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	b:RegisterForClicks("LeftButtonUp")
+
+	b:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(self.runeName or "")
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+	return b
 end
 
 function RRR:OpenPicker(slot, anchorButton)
-	currentSlot = slot
-	ToggleDropDownMenu(1, nil, menu, anchorButton, 0, 0)
+	if openForSlot == slot then
+		HideFlyout()
+		return
+	end
+
+	local runes = RRR:GetRunesForSlot(slot)
+
+	for _, b in ipairs(flyoutButtons) do
+		b:Hide()
+	end
+
+	for i, rune in ipairs(runes) do
+		local b = flyoutButtons[i]
+		if not b then
+			b = CreateFlyoutButton()
+			flyoutButtons[i] = b
+		end
+		b.icon:SetTexture(rune.iconTexture)
+		b.runeName = rune.name
+		b:SetScript("OnClick", function()
+			RRR:CastRuneOnSlot(rune.skillLineAbilityID)
+			HideFlyout()
+		end)
+		b:ClearAllPoints()
+		b:SetPoint("LEFT", flyout, "LEFT", (i - 1) * (ICON_SIZE + ICON_PADDING), 0)
+		b:Show()
+	end
+
+	local width = #runes > 0 and (#runes * ICON_SIZE + (#runes - 1) * ICON_PADDING) or ICON_SIZE
+	flyout:SetSize(width, ICON_SIZE)
+
+	flyout:ClearAllPoints()
+	flyout:SetPoint("BOTTOM", anchorButton, "TOP", 0, 6)
+	flyout:Show()
+	openForSlot = slot
 end
 
 function RRR:InitPicker()
-	menu = CreateFrame("Frame", "RuneReminderReforgedPickerMenu", UIParent, "UIDropDownMenuTemplate")
-	UIDropDownMenu_Initialize(menu, InitializePicker, "MENU")
+	flyout = CreateFrame("Frame", "RuneReminderReforgedPickerFlyout", UIParent)
+	flyout:SetFrameStrata("DIALOG")
+	flyout:Hide()
 end
