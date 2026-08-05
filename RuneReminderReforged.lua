@@ -106,6 +106,7 @@ function RRR:PLAYER_LOGIN()
 
 	RRR:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 	RRR:RegisterEvent("RUNE_UPDATED")
+	RRR:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 	RRR:SetupSlash()
 	RRR:Print("v" .. RRR.version .. " loaded. /rrr for options.")

@@ -126,6 +126,20 @@ function RRR:PLAYER_EQUIPMENT_CHANGED(_, slotID)
 	end
 end
 
+-- PLAYER_LOGIN can fire before equipment/engraving data is fully synced from
+-- the server, so InitEngraving's initial scan may find zero engravable slots
+-- (an empty, invisible widget). Force a full re-scan and re-fetch once the
+-- world is actually entered, and rebuild unconditionally so the widget is
+-- guaranteed to reflect reality even if nothing looked "changed" by the
+-- (possibly wrong) earlier comparison.
+function RRR:PLAYER_ENTERING_WORLD()
+	RRR.runeCache = {}
+	RRR:RefreshSlotList()
+	if RRR.RebuildWidgetSlots then
+		RRR:RebuildWidgetSlots()
+	end
+end
+
 -- Fires for any successful engrave (ours via the picker, Blizzard's own
 -- character panel, or another addon) -- deliberate engraving is never a
 -- mismatch, so this never routes through Notify.
