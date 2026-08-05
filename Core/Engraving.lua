@@ -1,11 +1,5 @@
---[[ Core/Engraving.lua — C_Engraving wrapper: slot discovery, per-slot rune
-cache, and change detection.
-
-Slot discovery loops the 19 standard equipment slots and asks
-C_Engraving.IsEquipmentSlotEngravable per slot, the same approach Blizzard's
-own paperdoll code uses -- simpler and more directly correct than filtering
-C_Engraving.GetRuneCategories, whose ownedOnly=false semantics aren't
-demonstrated anywhere in Blizzard's reference UI code.
+--[[ Core/Engraving.lua — C_Engraving wrapper: fixed slot list, per-slot
+rune cache, and change detection.
 
 CastRune needs no explicit slot targeting: each rune ability is already bound
 to one equipment slot, and the client/server resolves the target from the
@@ -16,21 +10,26 @@ local ADDON, ns = ...
 local RRR = ns.RRR
 
 ----------------------------------------------------------------------
--- Slot discovery
+-- Tracked slots
 ----------------------------------------------------------------------
 
--- Ordered so the widget lays out buttons in the same order as the paperdoll.
 -- SoD's rune-engraving system covers exactly 9 slot categories: chest,
 -- gloves, legs, waist, feet, head, wrist, back, and ring (confirmed via
 -- Icy Veins' SoD rune overview -- "Notably absent... shoulder, neck, and
--- trinket slots", and neither weapons nor tabard/shirt are armor). Ring
--- covers both physical finger slots. C_Engraving.IsEquipmentSlotEngravable
--- still gates each of these individually below, but it isn't reliable
--- enough on its own to also decide which slot *categories* are worth
--- probing in the first place: it returned true for INVSLOT_RANGED despite
--- ranged weapons not actually being engravable, so anything outside this
--- confirmed 9-category set is excluded here rather than trusted to
--- self-report correctly.
+-- trinket slots"; weapons and tabard/shirt aren't armor either). Ring
+-- covers both physical finger slots, hence 10 slot IDs for 9 categories.
+--
+-- This list is fixed and always shown, regardless of what's currently
+-- equipped there (or whether anything is). C_Engraving.IsEquipmentSlotEngravable
+-- reflects whether the CURRENTLY EQUIPPED ITEM in a slot is engravable, not
+-- whether the slot category is part of the system in general -- Blizzard's
+-- own paperdoll code uses it exactly that way. Gating which buttons exist on
+-- that call meant the widget could show nothing at all whenever none of the
+-- player's current gear happened to test as engravable at that instant, and
+-- it also returned true for INVSLOT_RANGED despite ranged weapons never
+-- being part of the system. A reminder widget should show a stable set of
+-- slots and just display "no rune" for whichever ones aren't currently
+-- engraved, rather than buttons appearing and disappearing with gear swaps.
 local ALL_SLOTS = {
 	INVSLOT_HEAD, INVSLOT_BACK, INVSLOT_CHEST,
 	INVSLOT_WRIST, INVSLOT_HAND, INVSLOT_WAIST, INVSLOT_LEGS, INVSLOT_FEET,
@@ -47,43 +46,25 @@ local function RunesMatch(a, b)
 	return a.skillLineAbilityID == b.skillLineAbilityID
 end
 
--- Re-scans which equipment slots are currently engravable. Returns true if
--- the set of tracked slots changed (so the widget knows to rebuild buttons
--- rather than just refresh icons). Cheap: 19 boolean calls.
-function RRR:RefreshSlotList()
-	local newSlots = {}
-	for _, slot in ipairs(ALL_SLOTS) do
-		if C_Engraving.IsEquipmentSlotEngravable(slot) then
-			newSlots[#newSlots + 1] = slot
-		end
-	end
-
-	local changed = false
-	if not RRR.slots or #RRR.slots ~= #newSlots then
-		changed = true
-	else
-		for i, slot in ipairs(newSlots) do
-			if RRR.slots[i] ~= slot then
-				changed = true
-				break
-			end
-		end
-	end
-
-	RRR.slots = newSlots
-	RRR.runeCache = RRR.runeCache or {}
+function RRR:InitEngraving()
+	RRR.slots = ALL_SLOTS
+	RRR.runeCache = {}
 	for _, slot in ipairs(RRR.slots) do
-		if RRR.runeCache[slot] == nil then
-			RRR.runeCache[slot] = C_Engraving.GetRuneForEquipmentSlot(slot)
-		end
+		RRR.runeCache[slot] = C_Engraving.GetRuneForEquipmentSlot(slot)
 	end
-
-	return changed
 end
 
-function RRR:InitEngraving()
-	RRR.runeCache = {}
-	RRR:RefreshSlotList()
+-- Re-fetches every tracked slot's rune fresh and refreshes its button. The
+-- slot set itself never changes, so this is just a full cache/UI refresh --
+-- used after a loading screen, where equipment data may not have been fully
+-- synced yet at the time InitEngraving originally ran.
+function RRR:RefreshAllRunes()
+	for _, slot in ipairs(RRR.slots) do
+		RRR.runeCache[slot] = C_Engraving.GetRuneForEquipmentSlot(slot)
+		if RRR.RefreshSlotButton then
+			RRR:RefreshSlotButton(slot)
+		end
+	end
 end
 
 ----------------------------------------------------------------------
@@ -107,8 +88,6 @@ end
 ----------------------------------------------------------------------
 
 function RRR:PLAYER_EQUIPMENT_CHANGED(_, slotID)
-	local slotSetChanged = RRR:RefreshSlotList()
-
 	local tracked = false
 	for _, slot in ipairs(RRR.slots) do
 		if slot == slotID then
@@ -116,38 +95,29 @@ function RRR:PLAYER_EQUIPMENT_CHANGED(_, slotID)
 			break
 		end
 	end
-
-	if tracked then
-		local oldRune = RRR.runeCache[slotID]
-		local newRune = C_Engraving.GetRuneForEquipmentSlot(slotID)
-		RRR.runeCache[slotID] = newRune
-		if not RunesMatch(oldRune, newRune) then
-			RRR:RuneMismatch(slotID, oldRune, newRune)
-		end
+	if not tracked then
+		return
 	end
 
-	-- A slot-set change means buttons must be rebuilt (covers this slot too,
-	-- since RebuildWidgetSlots re-reads runeCache -- already updated above).
-	-- Otherwise, just refresh the one button that actually changed.
-	if slotSetChanged and RRR.RebuildWidgetSlots then
-		RRR:RebuildWidgetSlots()
-	elseif tracked and RRR.RefreshSlotButton then
+	local oldRune = RRR.runeCache[slotID]
+	local newRune = C_Engraving.GetRuneForEquipmentSlot(slotID)
+	RRR.runeCache[slotID] = newRune
+
+	if RRR.RefreshSlotButton then
 		RRR:RefreshSlotButton(slotID)
+	end
+
+	if not RunesMatch(oldRune, newRune) then
+		RRR:RuneMismatch(slotID, oldRune, newRune)
 	end
 end
 
 -- PLAYER_LOGIN can fire before equipment/engraving data is fully synced from
--- the server, so InitEngraving's initial scan may find zero engravable slots
--- (an empty, invisible widget). Force a full re-scan and re-fetch once the
--- world is actually entered, and rebuild unconditionally so the widget is
--- guaranteed to reflect reality even if nothing looked "changed" by the
--- (possibly wrong) earlier comparison.
+-- the server, so InitEngraving's initial fetch may have grabbed stale/empty
+-- rune data for some slots. Force a full re-fetch once the world is
+-- actually entered.
 function RRR:PLAYER_ENTERING_WORLD()
-	RRR.runeCache = {}
-	RRR:RefreshSlotList()
-	if RRR.RebuildWidgetSlots then
-		RRR:RebuildWidgetSlots()
-	end
+	RRR:RefreshAllRunes()
 end
 
 -- Fires for any successful engrave (ours via the picker, Blizzard's own
@@ -161,11 +131,6 @@ function RRR:RUNE_UPDATED(_, rune)
 			RRR:RefreshSlotButton(slot)
 		end
 	else
-		for _, slot in ipairs(RRR.slots) do
-			RRR.runeCache[slot] = C_Engraving.GetRuneForEquipmentSlot(slot)
-			if RRR.RefreshSlotButton then
-				RRR:RefreshSlotButton(slot)
-			end
-		end
+		RRR:RefreshAllRunes()
 	end
 end

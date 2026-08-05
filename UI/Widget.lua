@@ -177,12 +177,3 @@ function RRR:BuildWidget()
 	RebuildButtons()
 	container:SetShown(RRR.db.widget.shown)
 end
-
--- Called by RefreshSlotList consumers (e.g. PLAYER_EQUIPMENT_CHANGED handler
--- indirectly, via a slot appearing/disappearing) when the tracked slot set
--- itself changes, not just an individual slot's rune.
-function RRR:RebuildWidgetSlots()
-	if container then
-		RebuildButtons()
-	end
-end
