@@ -49,6 +49,10 @@ end
 function RRR:InitEngraving()
 	RRR.slots = ALL_SLOTS
 	RRR.runeCache = {}
+	-- Blizzard's own EngravingFrame_OnShow always calls this before querying
+	-- any rune data; GetRuneForEquipmentSlot returned nil for every slot
+	-- without it, even for slots with a real engraved rune equipped.
+	C_Engraving.RefreshRunesList()
 	for _, slot in ipairs(RRR.slots) do
 		RRR.runeCache[slot] = C_Engraving.GetRuneForEquipmentSlot(slot)
 	end
@@ -59,6 +63,7 @@ end
 -- used after a loading screen, where equipment data may not have been fully
 -- synced yet at the time InitEngraving originally ran.
 function RRR:RefreshAllRunes()
+	C_Engraving.RefreshRunesList()
 	for _, slot in ipairs(RRR.slots) do
 		RRR.runeCache[slot] = C_Engraving.GetRuneForEquipmentSlot(slot)
 		if RRR.RefreshSlotButton then
