@@ -26,11 +26,12 @@ RRR.version = C_AddOns.GetAddOnMetadata(ADDON, "Version") or "0.0"
 ----------------------------------------------------------------------
 local DEFAULTS = {
 	widget = {
-		shown     = true,
-		locked    = false,
-		alignment = "HORIZONTAL", -- or "VERTICAL"
-		scale     = 1.0,
-		point     = { "CENTER", "UIParent", "CENTER", 0, 0 },
+		shown           = true,
+		locked          = false,
+		alignment       = "HORIZONTAL", -- or "VERTICAL"
+		flyoutDirection = "UP",         -- or "DOWN", "LEFT", "RIGHT"
+		scale           = 1.0,
+		point           = { "CENTER", "UIParent", "CENTER", 0, 0 },
 	},
 	notify = {
 		enabled = true,

@@ -129,6 +129,18 @@ local function BuildPage()
 	alignDD:PlaceAt(COL1 - 4, y)
 	y = y - 52
 
+	local flyoutDD = newDropdown(panel, "Flyout direction",
+		{
+			{ text = "Up", value = "UP" },
+			{ text = "Down", value = "DOWN" },
+			{ text = "Left", value = "LEFT" },
+			{ text = "Right", value = "RIGHT" },
+		},
+		function() return RRR.db.widget.flyoutDirection end,
+		function(v) RRR.db.widget.flyoutDirection = v end)
+	flyoutDD:PlaceAt(COL1 - 4, y)
+	y = y - 52
+
 	local sizeSlider = newSlider(panel, "Size", 0.5, 2.0, 0.1,
 		function() return RRR.db.widget.scale end,
 		function(v) RRR:SetWidgetScale(v) end)

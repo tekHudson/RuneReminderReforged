@@ -45,11 +45,14 @@ local function CreateFlyoutButton()
 	return b
 end
 
--- Perpendicular to the widget's own layout direction, so the flyout doesn't
--- run parallel to (and get confused with) the row/column of slot buttons.
-local function FlyoutIsVertical()
-	return RRR.db.widget.alignment ~= "VERTICAL"
-end
+-- Which edge of the flyout attaches to the clicked button, which edge the
+-- icons stack outward from, and whether that stacking is vertical.
+local DIRECTIONS = {
+	UP    = { flyoutPoint = "BOTTOM", relativePoint = "TOP",    x = 0,  y = 6,  iconPoint = "BOTTOM", vertical = true  },
+	DOWN  = { flyoutPoint = "TOP",    relativePoint = "BOTTOM", x = 0,  y = -6, iconPoint = "TOP",    vertical = true  },
+	LEFT  = { flyoutPoint = "RIGHT",  relativePoint = "LEFT",   x = -6, y = 0,  iconPoint = "RIGHT",  vertical = false },
+	RIGHT = { flyoutPoint = "LEFT",   relativePoint = "RIGHT",  x = 6,  y = 0,  iconPoint = "LEFT",   vertical = false },
+}
 
 function RRR:OpenPicker(slot, anchorButton)
 	if openForSlot == slot then
@@ -58,7 +61,7 @@ function RRR:OpenPicker(slot, anchorButton)
 	end
 
 	local runes = RRR:GetRunesForSlot(slot)
-	local vertical = FlyoutIsVertical()
+	local dir = DIRECTIONS[RRR.db.widget.flyoutDirection] or DIRECTIONS.UP
 	local step = ICON_SIZE + ICON_PADDING
 
 	for _, b in ipairs(flyoutButtons) do
@@ -78,23 +81,23 @@ function RRR:OpenPicker(slot, anchorButton)
 			HideFlyout()
 		end)
 		b:ClearAllPoints()
-		if vertical then
-			b:SetPoint("BOTTOM", flyout, "BOTTOM", 0, (i - 1) * step)
+		if dir.vertical then
+			b:SetPoint(dir.iconPoint, flyout, dir.iconPoint, 0, (i - 1) * step * (dir.iconPoint == "TOP" and -1 or 1))
 		else
-			b:SetPoint("LEFT", flyout, "LEFT", (i - 1) * step, 0)
+			b:SetPoint(dir.iconPoint, flyout, dir.iconPoint, (i - 1) * step * (dir.iconPoint == "RIGHT" and -1 or 1), 0)
 		end
 		b:Show()
 	end
 
 	local extent = #runes > 0 and (#runes * ICON_SIZE + (#runes - 1) * ICON_PADDING) or ICON_SIZE
-	if vertical then
+	if dir.vertical then
 		flyout:SetSize(ICON_SIZE, extent)
 	else
 		flyout:SetSize(extent, ICON_SIZE)
 	end
 
 	flyout:ClearAllPoints()
-	flyout:SetPoint("BOTTOM", anchorButton, "TOP", 0, 6)
+	flyout:SetPoint(dir.flyoutPoint, anchorButton, dir.relativePoint, dir.x, dir.y)
 	flyout:Show()
 	openForSlot = slot
 end
