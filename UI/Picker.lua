@@ -11,6 +11,12 @@ local menu
 local currentSlot
 
 local function InitializePicker(_, level)
+	-- UIDropDownMenu_Initialize invokes this once immediately during setup
+	-- (before any slot has ever been picked), not just lazily on open.
+	if not currentSlot then
+		return
+	end
+
 	local runes = RRR:GetRunesForSlot(currentSlot)
 
 	if #runes == 0 then
