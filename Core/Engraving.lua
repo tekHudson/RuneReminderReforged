@@ -118,18 +118,36 @@ end
 -- CastRune only selects the rune and enters "targeting mode" -- Blizzard's
 -- own EngravingFrameSpell_OnClick does nothing more than this either. The
 -- actual application to a specific slot happens when you then use/interact
--- with that inventory slot (UseInventoryItem(paperdollSlot)); a native
--- confirmation popup appears if it would overwrite an existing rune.
--- Confirmed via a community macro: "/click <rune> /use <slot>" -- e.g. slot
--- 5 for Chest, matching our own paperdoll slot numbering. Since the picker
--- already knows exactly which slot was clicked, complete that targeting
--- step automatically instead of requiring the player to separately click
--- the item afterward -- the native overwrite confirmation still applies
--- when relevant, so this doesn't bypass that safety check.
-function RRR:CastRuneOnSlot(skillLineAbilityID, slot)
-	C_Engraving.CastRune(skillLineAbilityID)
+-- with that inventory slot (UseInventoryItem(paperdollSlot)); if that slot
+-- already has a different rune engraved, a native StaticPopupDialogs
+-- ["REPLACE_ENCHANT"] confirmation appears, whose Yes button just calls
+-- C_Item.ReplaceEnchant() (confirmed in
+-- Blizzard_StaticPopup_Game/GameDialogDefs.lua). Calling that ourselves
+-- auto-confirms the overwrite instead of requiring a manual Yes click --
+-- this exact CastRune -> UseInventoryItem -> ReplaceEnchant sequence is
+-- what the original RuneReminder addon used too (via the deprecated bare
+-- global `ReplaceEnchant`, which is just an alias for C_Item.ReplaceEnchant
+-- gated behind the loadDeprecationFallbacks CVar -- using the namespaced
+-- form directly avoids that dependency). StaticPopup_Hide/ClearCursor are
+-- defensive cleanup for the same reason the original called them.
+function RRR:CastRuneOnSlot(rune, slot)
+	local oldRune = RRR.runeCache[slot]
+
+	ClearCursor()
+	C_Engraving.CastRune(rune.skillLineAbilityID)
 	if slot then
 		UseInventoryItem(slot)
+	end
+	-- Auto-confirms the overwrite (see note above) with zero visual "are you
+	-- sure" -- print a record of what happened so a misclick in the picker
+	-- is at least visible after the fact.
+	C_Item.ReplaceEnchant()
+	StaticPopup_Hide("REPLACE_ENCHANT")
+	ClearCursor()
+
+	if oldRune and oldRune.skillLineAbilityID ~= rune.skillLineAbilityID then
+		RRR:Print(string.format("Replaced |cffffcc00%s|r with |cffffcc00%s|r on your %s.",
+			oldRune.name, rune.name, RRR:GetSlotDisplayName(slot)))
 	end
 end
 
