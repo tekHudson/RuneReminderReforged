@@ -71,7 +71,7 @@ local function CreateSlotButton(slot)
 
 	button:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:AddLine(C_Item.GetItemInventorySlotInfo(self.slot) or "")
+		GameTooltip:AddLine(RRR:GetSlotDisplayName(self.slot))
 		local rune = RRR.runeCache[self.slot]
 		if rune then
 			GameTooltip:AddLine(rune.name, 1, 1, 1)

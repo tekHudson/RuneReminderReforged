@@ -10,7 +10,7 @@ function RRR:RuneMismatch(slot, oldRune, newRune)
 		return
 	end
 
-	local slotName = C_Item.GetItemInventorySlotInfo(slot) or "item"
+	local slotName = RRR:GetSlotDisplayName(slot)
 
 	if newRune then
 		if oldRune then

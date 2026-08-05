@@ -36,6 +36,36 @@ local ALL_SLOTS = {
 	INVSLOT_FINGER1, INVSLOT_FINGER2,
 }
 
+-- IMPORTANT: paperdoll slot positions (INVSLOT_*, used by
+-- GetRuneForEquipmentSlot/GetInventoryItemCooldown) and item equip-location
+-- *types* (Enum.InventoryType, used by GetRunesForCategory and
+-- C_Item.GetItemInventorySlotInfo) are two DIFFERENT numbering schemes that
+-- happen to share values 1-11 but diverge after that: INVSLOT_BACK=15 but
+-- Enum.InventoryType.IndexCloakType=16, while Enum.InventoryType.IndexRangedType
+-- happens to equal 15 -- so passing the paperdoll Back slot into a function
+-- expecting an InventoryType returned "Ranged" instead of "Back". Confirmed
+-- against Blizzard_APIDocumentationGenerated/ItemConstantsDocumentation.lua.
+-- Finger1 and Finger2 both map to the single IndexFingerType category (rings
+-- aren't distinguished by which of the two slots they're in for this purpose).
+local PAPERDOLL_TO_INVTYPE = {
+	[INVSLOT_HEAD]    = Enum.InventoryType.IndexHeadType,
+	[INVSLOT_CHEST]   = Enum.InventoryType.IndexChestType,
+	[INVSLOT_WAIST]   = Enum.InventoryType.IndexWaistType,
+	[INVSLOT_LEGS]    = Enum.InventoryType.IndexLegsType,
+	[INVSLOT_FEET]    = Enum.InventoryType.IndexFeetType,
+	[INVSLOT_WRIST]   = Enum.InventoryType.IndexWristType,
+	[INVSLOT_HAND]    = Enum.InventoryType.IndexHandType,
+	[INVSLOT_FINGER1] = Enum.InventoryType.IndexFingerType,
+	[INVSLOT_FINGER2] = Enum.InventoryType.IndexFingerType,
+	[INVSLOT_BACK]    = Enum.InventoryType.IndexCloakType,
+}
+
+-- Human-readable slot name for tooltips, via the InventoryType-based API.
+function RRR:GetSlotDisplayName(slot)
+	local category = PAPERDOLL_TO_INVTYPE[slot] or slot
+	return C_Item.GetItemInventorySlotInfo(category) or "Unknown Slot"
+end
+
 local function RunesMatch(a, b)
 	if a == nil and b == nil then
 		return true
@@ -79,7 +109,8 @@ end
 -- Fresh query every time (no caching) so newly-learned runes show up
 -- immediately without any extra event wiring.
 function RRR:GetRunesForSlot(slot)
-	local runes = C_Engraving.GetRunesForCategory(slot, true)
+	local category = PAPERDOLL_TO_INVTYPE[slot] or slot
+	local runes = C_Engraving.GetRunesForCategory(category, true)
 	table.sort(runes, function(a, b) return a.name < b.name end)
 	return runes
 end
@@ -128,14 +159,12 @@ end
 -- Fires for any successful engrave (ours via the picker, Blizzard's own
 -- character panel, or another addon) -- deliberate engraving is never a
 -- mismatch, so this never routes through Notify.
+--
+-- rune.equipmentSlot (when non-nil) is an InventoryType category, not a
+-- paperdoll slot -- and since Finger1/Finger2 share one category, it can't
+-- be reliably mapped back to which specific tracked slot changed. Simplest
+-- correct handling: always do a full refresh, matching the nil-rune case.
+-- Cheap (10 API calls), and RUNE_UPDATED only fires on an actual engrave.
 function RRR:RUNE_UPDATED(_, rune)
-	if rune then
-		local slot = rune.equipmentSlot
-		RRR.runeCache[slot] = C_Engraving.GetRuneForEquipmentSlot(slot)
-		if RRR.RefreshSlotButton then
-			RRR:RefreshSlotButton(slot)
-		end
-	else
-		RRR:RefreshAllRunes()
-	end
+	RRR:RefreshAllRunes()
 end
