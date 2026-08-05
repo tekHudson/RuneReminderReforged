@@ -45,6 +45,12 @@ local function CreateFlyoutButton()
 	return b
 end
 
+-- Perpendicular to the widget's own layout direction, so the flyout doesn't
+-- run parallel to (and get confused with) the row/column of slot buttons.
+local function FlyoutIsVertical()
+	return RRR.db.widget.alignment ~= "VERTICAL"
+end
+
 function RRR:OpenPicker(slot, anchorButton)
 	if openForSlot == slot then
 		HideFlyout()
@@ -52,6 +58,8 @@ function RRR:OpenPicker(slot, anchorButton)
 	end
 
 	local runes = RRR:GetRunesForSlot(slot)
+	local vertical = FlyoutIsVertical()
+	local step = ICON_SIZE + ICON_PADDING
 
 	for _, b in ipairs(flyoutButtons) do
 		b:Hide()
@@ -70,12 +78,20 @@ function RRR:OpenPicker(slot, anchorButton)
 			HideFlyout()
 		end)
 		b:ClearAllPoints()
-		b:SetPoint("LEFT", flyout, "LEFT", (i - 1) * (ICON_SIZE + ICON_PADDING), 0)
+		if vertical then
+			b:SetPoint("BOTTOM", flyout, "BOTTOM", 0, (i - 1) * step)
+		else
+			b:SetPoint("LEFT", flyout, "LEFT", (i - 1) * step, 0)
+		end
 		b:Show()
 	end
 
-	local width = #runes > 0 and (#runes * ICON_SIZE + (#runes - 1) * ICON_PADDING) or ICON_SIZE
-	flyout:SetSize(width, ICON_SIZE)
+	local extent = #runes > 0 and (#runes * ICON_SIZE + (#runes - 1) * ICON_PADDING) or ICON_SIZE
+	if vertical then
+		flyout:SetSize(ICON_SIZE, extent)
+	else
+		flyout:SetSize(extent, ICON_SIZE)
+	end
 
 	flyout:ClearAllPoints()
 	flyout:SetPoint("BOTTOM", anchorButton, "TOP", 0, 6)
