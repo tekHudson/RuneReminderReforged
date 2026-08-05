@@ -1,0 +1,4 @@
+.release
+*.bak
+*.tmp
+.DS_Store

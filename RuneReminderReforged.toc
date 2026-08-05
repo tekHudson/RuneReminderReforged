@@ -1,0 +1,16 @@
+## Interface: 11509
+## Title: Rune Reminder Reforged
+## Notes: Lightweight live tracker for Season of Discovery engraving runes -- per-slot picker, cooldowns, and a chat nudge when a gear swap changes a slot's rune.
+## Author: tek
+## Version: 1.0.0
+## SavedVariablesPerCharacter: RuneReminderReforgedDB
+
+# Core
+RuneReminderReforged.lua
+Core\Engraving.lua
+Core\Notify.lua
+
+# UI
+UI\Widget.lua
+UI\Picker.lua
+UI\Options.lua
