@@ -1,8 +1,9 @@
 --[[ Core/Notify.lua — chat notification when a gear swap silently changes
 or clears a tracked slot's rune. When a slot goes from having a rune to
-having none, also shows a small one-click "Reapply?" prompt on the widget
-(UI/Widget.lua:ShowReapplyPrompt) -- not a blocking popup, just a bare
-clickable nudge.
+having none, also shows a "Reapply?" confirmation dialog
+(UI/Widget.lua:ShowReapplyPrompt) -- non-modal (doesn't block the game),
+dismissed via its own Yes/No/Escape, or automatically if that slot's gear
+changes again before it's answered.
 ]]
 
 local ADDON, ns = ...

@@ -162,59 +162,62 @@ local function RebuildButtons()
 end
 
 ----------------------------------------------------------------------
--- Reapply prompt: a small one-click, non-modal nudge shown at a slot when
--- a gear swap cleared its rune (see Core/Notify.lua). Not a StaticPopup --
--- just a bare clickable frame, matching the picker's lightweight style.
+-- Reapply prompt: a non-modal dialog shown when a gear swap cleared a
+-- tracked slot's rune (see Core/Notify.lua). Styled after the classic
+-- StaticPopup dialog box (same background/border art Blizzard's own
+-- popups use, e.g. the REPLACE_ENCHANT confirmation in Core/Engraving.lua)
+-- to match the original RuneReminder addon's look, and anchored dead
+-- center on screen rather than off a slot button.
 ----------------------------------------------------------------------
 
 local reapplyPrompt
 
 local function CreateReapplyPrompt()
-	local p = CreateFrame("Button", "RuneReminderReforgedReapplyPrompt", UIParent)
-	p:SetSize(160, 28)
+	local p = CreateFrame("Frame", "RuneReminderReforgedReapplyPrompt", UIParent, "BackdropTemplate")
+	p:SetSize(280, 110)
 	p:SetFrameStrata("DIALOG")
+	p:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	p:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+		tile = true, tileSize = 32, edgeSize = 32,
+		insets = { left = 11, right = 12, top = 12, bottom = 11 },
+	})
 
-	local bg = p:CreateTexture(nil, "BACKGROUND")
-	bg:SetAllPoints()
-	bg:SetColorTexture(0, 0, 0, 0.8)
+	p:SetMovable(true)
+	p:EnableMouse(true)
+	p:RegisterForDrag("LeftButton")
+	p:SetScript("OnDragStart", p.StartMoving)
+	p:SetScript("OnDragStop", p.StopMovingOrSizing)
 
 	p.icon = p:CreateTexture(nil, "ARTWORK")
-	p.icon:SetSize(24, 24)
-	p.icon:SetPoint("LEFT", 2, 0)
+	p.icon:SetSize(32, 32)
+	p.icon:SetPoint("TOP", 0, -20)
 	p.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-	p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	p.text:SetPoint("LEFT", p.icon, "RIGHT", 4, 0)
-	p.text:SetPoint("RIGHT", -4, 0)
-	p.text:SetJustifyH("LEFT")
-	p.text:SetWordWrap(false)
+	p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	p.text:SetPoint("TOP", p.icon, "BOTTOM", 0, -10)
+	p.text:SetPoint("LEFT", 16, 0)
+	p.text:SetPoint("RIGHT", -16, 0)
+	p.text:SetJustifyH("CENTER")
 
-	p:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-	p:RegisterForClicks("LeftButtonUp")
-	p:SetScript("OnClick", function(self)
-		if self.onConfirm then
-			self.onConfirm()
+	p.accept = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+	p.accept:SetSize(90, 22)
+	p.accept:SetPoint("BOTTOMLEFT", 20, 16)
+	p.accept:SetText(YES or "Yes")
+	p.accept:SetScript("OnClick", function()
+		if p.onConfirm then
+			p.onConfirm()
 		end
-		self:Hide()
-	end)
-
-	-- Small explicit dismiss button, separate from the main clickable area
-	-- (which reapplies) -- stays up until manually dismissed one way or
-	-- another, no auto-hide timer.
-	local close = CreateFrame("Button", nil, p)
-	close:SetSize(14, 14)
-	close:SetPoint("TOPRIGHT", -2, -2)
-	local closeText = close:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	closeText:SetAllPoints()
-	closeText:SetText("x")
-	close:SetScript("OnClick", function()
 		p:Hide()
 	end)
-	close:SetScript("OnEnter", function(self)
-		closeText:SetTextColor(1, 0.3, 0.3)
-	end)
-	close:SetScript("OnLeave", function(self)
-		closeText:SetTextColor(1, 1, 1)
+
+	p.cancel = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+	p.cancel:SetSize(90, 22)
+	p.cancel:SetPoint("BOTTOMRIGHT", -20, 16)
+	p.cancel:SetText(NO or "No")
+	p.cancel:SetScript("OnClick", function()
+		p:Hide()
 	end)
 
 	-- Escape dismisses it too, same as any other WoW UI panel.
@@ -224,36 +227,29 @@ local function CreateReapplyPrompt()
 	return p
 end
 
--- Anchored the same direction as the picker flyout (widget.flyoutDirection),
--- so it appears in a visually consistent spot.
-local PROMPT_DIRECTIONS = {
-	UP    = { point = "BOTTOM", relativePoint = "TOP",    x = 0,  y = 6  },
-	DOWN  = { point = "TOP",    relativePoint = "BOTTOM", x = 0,  y = -6 },
-	LEFT  = { point = "RIGHT",  relativePoint = "LEFT",   x = -6, y = 0  },
-	RIGHT = { point = "LEFT",   relativePoint = "RIGHT",  x = 6,  y = 0  },
-}
-
 function RRR:ShowReapplyPrompt(slot, oldRune)
-	local button = buttons[slot]
-	if not button then
-		return
-	end
-
 	if not reapplyPrompt then
 		reapplyPrompt = CreateReapplyPrompt()
 	end
 
+	reapplyPrompt.slot = slot
 	reapplyPrompt.icon:SetTexture(oldRune.iconTexture)
 	reapplyPrompt.text:SetText("Reapply " .. oldRune.name .. "?")
 	reapplyPrompt.onConfirm = function()
 		RRR:CastRuneOnSlot(oldRune, slot)
 	end
-	reapplyPrompt:SetScale(RRR.db.widget.scale)
-
-	local dir = PROMPT_DIRECTIONS[RRR.db.widget.flyoutDirection] or PROMPT_DIRECTIONS.UP
 	reapplyPrompt:ClearAllPoints()
-	reapplyPrompt:SetPoint(dir.point, button, dir.relativePoint, dir.x, dir.y)
+	reapplyPrompt:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 	reapplyPrompt:Show()
+end
+
+-- Dismisses a still-open prompt for `slot` -- called whenever that slot's
+-- equipment changes again, so a stale "Reapply?" doesn't linger once the
+-- rune is back (or the slot's moved on to something else entirely).
+function RRR:HideReapplyPrompt(slot)
+	if reapplyPrompt and reapplyPrompt:IsShown() and reapplyPrompt.slot == slot then
+		reapplyPrompt:Hide()
+	end
 end
 
 ----------------------------------------------------------------------

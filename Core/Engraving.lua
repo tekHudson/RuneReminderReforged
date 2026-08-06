@@ -175,6 +175,13 @@ function RRR:PLAYER_EQUIPMENT_CHANGED(_, slotID)
 		RRR:RefreshSlotButton(slotID)
 	end
 
+	-- Any further equipment change on this slot invalidates a still-open
+	-- "Reapply?" prompt for it -- whether the rune's back or a different
+	-- item entirely went on, the prompt's context is stale either way.
+	if RRR.HideReapplyPrompt then
+		RRR:HideReapplyPrompt(slotID)
+	end
+
 	if not RunesMatch(oldRune, newRune) then
 		RRR:RuneMismatch(slotID, oldRune, newRune)
 	end
@@ -184,8 +191,17 @@ end
 -- the server, so InitEngraving's initial fetch may have grabbed stale/empty
 -- rune data for some slots. Force a full re-fetch once the world is
 -- actually entered.
+--
+-- A loading screen (hearth, taxi, dungeon/instance transition, etc.) can
+-- finish -- firing this event -- before the server's actually finished
+-- re-syncing engraving data to the client, so even this fetch can still
+-- come back empty for every slot. One more pass a couple seconds later
+-- catches that case without needing to hook additional events.
 function RRR:PLAYER_ENTERING_WORLD()
 	RRR:RefreshAllRunes()
+	C_Timer.After(2, function()
+		RRR:RefreshAllRunes()
+	end)
 end
 
 -- Fires for any successful engrave (ours via the picker, Blizzard's own
