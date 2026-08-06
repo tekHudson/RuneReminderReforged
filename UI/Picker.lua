@@ -57,6 +57,28 @@ local DIRECTIONS = {
 	RIGHT = { flyoutPoint = "LEFT",   relativePoint = "RIGHT",  x = 6,  y = 0,  iconPoint = "LEFT",   vertical = false },
 }
 
+local function CreateFlyout()
+	local f = CreateFrame("Frame", "RuneReminderReforgedPickerFlyout", UIParent)
+	f:SetFrameStrata("DIALOG")
+
+	local bg = f:CreateTexture(nil, "BACKGROUND")
+	bg:SetAllPoints()
+	bg:SetColorTexture(0, 0, 0, 0.5)
+
+	-- Shown instead of an icon row when the slot's category has no runes the
+	-- player currently knows (GetRunesForSlot's ownedOnly=true can legitimately
+	-- return an empty list, e.g. Head runes learned later than other slots'). A
+	-- flyout with zero icons and no background was otherwise indistinguishable
+	-- from nothing happening on click at all.
+	f.emptyText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	f.emptyText:SetPoint("CENTER")
+	f.emptyText:SetText("No runes known for this slot")
+	f.emptyText:Hide()
+
+	f:Hide()
+	return f
+end
+
 function RRR:OpenPicker(slot, anchorButton)
 	if openForSlot == slot then
 		HideFlyout()
@@ -97,11 +119,17 @@ function RRR:OpenPicker(slot, anchorButton)
 		b:Show()
 	end
 
-	local extent = #runes > 0 and (#runes * ICON_SIZE + (#runes - 1) * ICON_PADDING) or ICON_SIZE
-	if dir.vertical then
-		flyout:SetSize(ICON_SIZE, extent)
+	if #runes == 0 then
+		flyout.emptyText:Show()
+		flyout:SetSize(flyout.emptyText:GetStringWidth() + 16, ICON_SIZE)
 	else
-		flyout:SetSize(extent, ICON_SIZE)
+		flyout.emptyText:Hide()
+		local extent = #runes * ICON_SIZE + (#runes - 1) * ICON_PADDING
+		if dir.vertical then
+			flyout:SetSize(ICON_SIZE, extent)
+		else
+			flyout:SetSize(extent, ICON_SIZE)
+		end
 	end
 
 	flyout:ClearAllPoints()
@@ -111,7 +139,5 @@ function RRR:OpenPicker(slot, anchorButton)
 end
 
 function RRR:InitPicker()
-	flyout = CreateFrame("Frame", "RuneReminderReforgedPickerFlyout", UIParent)
-	flyout:SetFrameStrata("DIALOG")
-	flyout:Hide()
+	flyout = CreateFlyout()
 end
