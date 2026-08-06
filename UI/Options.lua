@@ -120,6 +120,13 @@ local function BuildPage()
 		function() return RRR.db.notify.enabled end,
 		function(v) RRR.db.notify.enabled = v end)
 	notifyCB:SetPoint("TOPLEFT", panel, "TOPLEFT", COL1, y)
+	y = y - ROW
+
+	local labelHoverCB = newCheckbox(panel, "Text on hover",
+		"Show each slot's name only on mouseover. Unchecked, slot names are always shown.",
+		function() return RRR.db.widget.labelOnHover end,
+		function(v) RRR:SetLabelOnHover(v) end)
+	labelHoverCB:SetPoint("TOPLEFT", panel, "TOPLEFT", COL1, y)
 	y = y - ROW - 12
 
 	local LAYOUT_CHOICES = {

@@ -2,7 +2,7 @@
 ## Title: Rune Reminder Reforged
 ## Notes: Lightweight live tracker for Season of Discovery engraving runes -- per-slot picker, cooldowns, and a chat nudge when a gear swap changes a slot's rune.
 ## Author: tek
-## Version: 1.0.4
+## Version: 1.0.5
 ## X-Curse-Project-ID: 1640798
 ## SavedVariablesPerCharacter: RuneReminderReforgedDB
 

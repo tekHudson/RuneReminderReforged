@@ -31,41 +31,21 @@ local function RestorePosition()
 end
 
 ----------------------------------------------------------------------
--- Hover label: bare slot-name text above (or, when the picker flyout
--- expands upward and would collide with it, below) the hovered button --
--- replaces a full GameTooltip, which was oversized for just a slot name.
+-- Slot label: bare slot-name text overlaid on the button itself (near the
+-- top edge, over the icon), white so it reads against any icon. Shown only
+-- on hover by default, or always shown when widget.labelOnHover is false
+-- (see RRR:SetLabelOnHover, wired to the options checkbox) -- an
+-- always-visible label positioned above/below the button collided with
+-- neighboring buttons in a vertical layout, so it stays inside the button.
 ----------------------------------------------------------------------
 
-local hoverLabel
-
-local function CreateHoverLabel()
-	local f = CreateFrame("Frame", nil, UIParent)
-	f:SetSize(1, 1)
-	f:SetFrameStrata("TOOLTIP")
-	f.text = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	f.text:SetPoint("CENTER")
-	f:Hide()
-	return f
-end
-
-local function ShowHoverLabel(button)
-	if not hoverLabel then
-		hoverLabel = CreateHoverLabel()
-	end
-	hoverLabel.text:SetText(RRR:GetSlotDisplayName(button.slot))
-	hoverLabel:ClearAllPoints()
-	if RRR.db.widget.flyoutDirection == "UP" then
-		hoverLabel:SetPoint("TOP", button, "BOTTOM", 0, -4)
-	else
-		hoverLabel:SetPoint("BOTTOM", button, "TOP", 0, 4)
-	end
-	hoverLabel:Show()
-end
-
-local function HideHoverLabel()
-	if hoverLabel then
-		hoverLabel:Hide()
-	end
+local function CreateSlotLabel(button)
+	local label = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	label:SetText(RRR:GetSlotDisplayName(button.slot))
+	label:SetTextColor(1, 1, 1, 1)
+	label:SetPoint("TOP", button, "TOP", 0, -2)
+	label:SetShown(not RRR.db.widget.labelOnHover)
+	return label
 end
 
 ----------------------------------------------------------------------
@@ -107,11 +87,17 @@ local function CreateSlotButton(slot)
 		SavePosition()
 	end)
 
+	button.label = CreateSlotLabel(button)
+
 	button:SetScript("OnEnter", function(self)
-		ShowHoverLabel(self)
+		if RRR.db.widget.labelOnHover then
+			self.label:Show()
+		end
 	end)
-	button:SetScript("OnLeave", function()
-		HideHoverLabel()
+	button:SetScript("OnLeave", function(self)
+		if RRR.db.widget.labelOnHover then
+			self.label:Hide()
+		end
 	end)
 
 	return button
@@ -282,6 +268,13 @@ end
 function RRR:SetWidgetScale(scale)
 	RRR.db.widget.scale = scale
 	container:SetScale(scale)
+end
+
+function RRR:SetLabelOnHover(onHover)
+	RRR.db.widget.labelOnHover = onHover
+	for _, button in pairs(buttons) do
+		button.label:SetShown(not onHover)
+	end
 end
 
 function RRR:SetWidgetAlignment(alignment)

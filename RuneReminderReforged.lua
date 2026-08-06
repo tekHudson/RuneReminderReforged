@@ -32,6 +32,7 @@ local DEFAULTS = {
 		flyoutDirection = "UP",         -- or "DOWN", "LEFT", "RIGHT"
 		scale           = 1.0,
 		point           = { "CENTER", "UIParent", "CENTER", 0, 0 },
+		labelOnHover    = true,         -- false = slot-name label always shown, not just on hover
 	},
 	notify = {
 		enabled = true,
