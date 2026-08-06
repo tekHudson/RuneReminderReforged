@@ -37,7 +37,10 @@ local function CreateFlyoutButton()
 
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText(self.runeName or "")
+		-- Same call Blizzard's own EngravingFrame rune buttons use
+		-- (RuneSpellButton_OnEnter) -- gives name + full description, not just
+		-- the name we'd have to type out ourselves.
+		GameTooltip:SetEngravingRune(self.skillLineAbilityID)
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -64,6 +67,11 @@ function RRR:OpenPicker(slot, anchorButton)
 	local dir = DIRECTIONS[RRR.db.widget.flyoutDirection] or DIRECTIONS.UP
 	local step = ICON_SIZE + ICON_PADDING
 
+	-- flyout is parented to UIParent (not the widget container), so it
+	-- doesn't inherit the widget's scale automatically -- match it here so
+	-- the flyout's icons stay visually proportional to the widget's own.
+	flyout:SetScale(RRR.db.widget.scale)
+
 	for _, b in ipairs(flyoutButtons) do
 		b:Hide()
 	end
@@ -75,7 +83,7 @@ function RRR:OpenPicker(slot, anchorButton)
 			flyoutButtons[i] = b
 		end
 		b.icon:SetTexture(rune.iconTexture)
-		b.runeName = rune.name
+		b.skillLineAbilityID = rune.skillLineAbilityID
 		b:SetScript("OnClick", function()
 			RRR:CastRuneOnSlot(rune, slot)
 			HideFlyout()

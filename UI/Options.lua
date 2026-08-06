@@ -138,7 +138,7 @@ local function BuildPage()
 			RRR.db.widget.flyoutDirection = direction
 		end)
 	layoutDD:PlaceAt(COL1 - 4, y)
-	y = y - 52
+	y = y - 52 - 16
 
 	local sizeSlider = newSlider(panel, "Size", 0.5, 2.0, 0.1,
 		function() return RRR.db.widget.scale end,

@@ -31,6 +31,44 @@ local function RestorePosition()
 end
 
 ----------------------------------------------------------------------
+-- Hover label: bare slot-name text above (or, when the picker flyout
+-- expands upward and would collide with it, below) the hovered button --
+-- replaces a full GameTooltip, which was oversized for just a slot name.
+----------------------------------------------------------------------
+
+local hoverLabel
+
+local function CreateHoverLabel()
+	local f = CreateFrame("Frame", nil, UIParent)
+	f:SetSize(1, 1)
+	f:SetFrameStrata("TOOLTIP")
+	f.text = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	f.text:SetPoint("CENTER")
+	f:Hide()
+	return f
+end
+
+local function ShowHoverLabel(button)
+	if not hoverLabel then
+		hoverLabel = CreateHoverLabel()
+	end
+	hoverLabel.text:SetText(RRR:GetSlotDisplayName(button.slot))
+	hoverLabel:ClearAllPoints()
+	if RRR.db.widget.flyoutDirection == "UP" then
+		hoverLabel:SetPoint("TOP", button, "BOTTOM", 0, -4)
+	else
+		hoverLabel:SetPoint("BOTTOM", button, "TOP", 0, 4)
+	end
+	hoverLabel:Show()
+end
+
+local function HideHoverLabel()
+	if hoverLabel then
+		hoverLabel:Hide()
+	end
+end
+
+----------------------------------------------------------------------
 -- Slot buttons
 ----------------------------------------------------------------------
 
@@ -70,18 +108,11 @@ local function CreateSlotButton(slot)
 	end)
 
 	button:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:AddLine(RRR:GetSlotDisplayName(self.slot))
-		local rune = RRR.runeCache[self.slot]
-		if rune then
-			GameTooltip:AddLine(rune.name, 1, 1, 1)
-		else
-			GameTooltip:AddLine("No rune engraved", 0.6, 0.6, 0.6)
-		end
-		GameTooltip:AddLine("Click to choose a rune", 0.6, 0.6, 0.6)
-		GameTooltip:Show()
+		ShowHoverLabel(self)
 	end)
-	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	button:SetScript("OnLeave", function()
+		HideHoverLabel()
+	end)
 
 	return button
 end
@@ -142,6 +173,101 @@ local function RebuildButtons()
 		RRR:RefreshSlotButton(slot)
 	end
 	RRR:LayoutSlots()
+end
+
+----------------------------------------------------------------------
+-- Reapply prompt: a small one-click, non-modal nudge shown at a slot when
+-- a gear swap cleared its rune (see Core/Notify.lua). Not a StaticPopup --
+-- just a bare clickable frame, matching the picker's lightweight style.
+----------------------------------------------------------------------
+
+local reapplyPrompt
+
+local function CreateReapplyPrompt()
+	local p = CreateFrame("Button", "RuneReminderReforgedReapplyPrompt", UIParent)
+	p:SetSize(160, 28)
+	p:SetFrameStrata("DIALOG")
+
+	local bg = p:CreateTexture(nil, "BACKGROUND")
+	bg:SetAllPoints()
+	bg:SetColorTexture(0, 0, 0, 0.8)
+
+	p.icon = p:CreateTexture(nil, "ARTWORK")
+	p.icon:SetSize(24, 24)
+	p.icon:SetPoint("LEFT", 2, 0)
+	p.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+	p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	p.text:SetPoint("LEFT", p.icon, "RIGHT", 4, 0)
+	p.text:SetPoint("RIGHT", -4, 0)
+	p.text:SetJustifyH("LEFT")
+	p.text:SetWordWrap(false)
+
+	p:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	p:RegisterForClicks("LeftButtonUp")
+	p:SetScript("OnClick", function(self)
+		if self.onConfirm then
+			self.onConfirm()
+		end
+		self:Hide()
+	end)
+
+	-- Small explicit dismiss button, separate from the main clickable area
+	-- (which reapplies) -- stays up until manually dismissed one way or
+	-- another, no auto-hide timer.
+	local close = CreateFrame("Button", nil, p)
+	close:SetSize(14, 14)
+	close:SetPoint("TOPRIGHT", -2, -2)
+	local closeText = close:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	closeText:SetAllPoints()
+	closeText:SetText("x")
+	close:SetScript("OnClick", function()
+		p:Hide()
+	end)
+	close:SetScript("OnEnter", function(self)
+		closeText:SetTextColor(1, 0.3, 0.3)
+	end)
+	close:SetScript("OnLeave", function(self)
+		closeText:SetTextColor(1, 1, 1)
+	end)
+
+	-- Escape dismisses it too, same as any other WoW UI panel.
+	tinsert(UISpecialFrames, p:GetName())
+
+	p:Hide()
+	return p
+end
+
+-- Anchored the same direction as the picker flyout (widget.flyoutDirection),
+-- so it appears in a visually consistent spot.
+local PROMPT_DIRECTIONS = {
+	UP    = { point = "BOTTOM", relativePoint = "TOP",    x = 0,  y = 6  },
+	DOWN  = { point = "TOP",    relativePoint = "BOTTOM", x = 0,  y = -6 },
+	LEFT  = { point = "RIGHT",  relativePoint = "LEFT",   x = -6, y = 0  },
+	RIGHT = { point = "LEFT",   relativePoint = "RIGHT",  x = 6,  y = 0  },
+}
+
+function RRR:ShowReapplyPrompt(slot, oldRune)
+	local button = buttons[slot]
+	if not button then
+		return
+	end
+
+	if not reapplyPrompt then
+		reapplyPrompt = CreateReapplyPrompt()
+	end
+
+	reapplyPrompt.icon:SetTexture(oldRune.iconTexture)
+	reapplyPrompt.text:SetText("Reapply " .. oldRune.name .. "?")
+	reapplyPrompt.onConfirm = function()
+		RRR:CastRuneOnSlot(oldRune, slot)
+	end
+	reapplyPrompt:SetScale(RRR.db.widget.scale)
+
+	local dir = PROMPT_DIRECTIONS[RRR.db.widget.flyoutDirection] or PROMPT_DIRECTIONS.UP
+	reapplyPrompt:ClearAllPoints()
+	reapplyPrompt:SetPoint(dir.point, button, dir.relativePoint, dir.x, dir.y)
+	reapplyPrompt:Show()
 end
 
 ----------------------------------------------------------------------
