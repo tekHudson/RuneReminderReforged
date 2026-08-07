@@ -162,19 +162,21 @@ local function RebuildButtons()
 end
 
 ----------------------------------------------------------------------
--- Reapply prompt: a non-modal dialog shown when a gear swap cleared a
--- tracked slot's rune (see Core/Notify.lua). Styled after the classic
--- StaticPopup dialog box (same background/border art Blizzard's own
--- popups use, e.g. the REPLACE_ENCHANT confirmation in Core/Engraving.lua)
--- to match the original RuneReminder addon's look, and anchored dead
--- center on screen rather than off a slot button.
+-- Reapply prompt: a small non-modal dialog shown when a gear swap cleared
+-- a tracked slot's rune (see Core/Notify.lua). Just two buttons side by
+-- side -- the message lives in the accept button's own label, so there's
+-- no separate title/icon taking up space. Styled with the classic dialog
+-- box background/border (same art Blizzard's own popups use) and anchored
+-- dead center on screen.
 ----------------------------------------------------------------------
+
+local REAPPLY_PADDING = 14
+local REAPPLY_BUTTON_HEIGHT = 22
 
 local reapplyPrompt
 
 local function CreateReapplyPrompt()
 	local p = CreateFrame("Frame", "RuneReminderReforgedReapplyPrompt", UIParent, "BackdropTemplate")
-	p:SetSize(280, 110)
 	p:SetFrameStrata("DIALOG")
 	p:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 	p:SetBackdrop({
@@ -190,21 +192,8 @@ local function CreateReapplyPrompt()
 	p:SetScript("OnDragStart", p.StartMoving)
 	p:SetScript("OnDragStop", p.StopMovingOrSizing)
 
-	p.icon = p:CreateTexture(nil, "ARTWORK")
-	p.icon:SetSize(32, 32)
-	p.icon:SetPoint("TOP", 0, -20)
-	p.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-	p.text = p:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	p.text:SetPoint("TOP", p.icon, "BOTTOM", 0, -10)
-	p.text:SetPoint("LEFT", 16, 0)
-	p.text:SetPoint("RIGHT", -16, 0)
-	p.text:SetJustifyH("CENTER")
-
 	p.accept = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-	p.accept:SetSize(90, 22)
-	p.accept:SetPoint("BOTTOMLEFT", 20, 16)
-	p.accept:SetText(YES or "Yes")
+	p.accept:SetHeight(REAPPLY_BUTTON_HEIGHT)
 	p.accept:SetScript("OnClick", function()
 		if p.onConfirm then
 			p.onConfirm()
@@ -213,9 +202,8 @@ local function CreateReapplyPrompt()
 	end)
 
 	p.cancel = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-	p.cancel:SetSize(90, 22)
-	p.cancel:SetPoint("BOTTOMRIGHT", -20, 16)
-	p.cancel:SetText(NO or "No")
+	p.cancel:SetHeight(REAPPLY_BUTTON_HEIGHT)
+	p.cancel:SetText(CANCEL or "Cancel")
 	p.cancel:SetScript("OnClick", function()
 		p:Hide()
 	end)
@@ -233,11 +221,24 @@ function RRR:ShowReapplyPrompt(slot, oldRune)
 	end
 
 	reapplyPrompt.slot = slot
-	reapplyPrompt.icon:SetTexture(oldRune.iconTexture)
-	reapplyPrompt.text:SetText("Reapply " .. oldRune.name .. "?")
 	reapplyPrompt.onConfirm = function()
 		RRR:CastRuneOnSlot(oldRune, slot)
 	end
+
+	local accept, cancel = reapplyPrompt.accept, reapplyPrompt.cancel
+	accept:SetText("Re-apply " .. oldRune.name)
+	accept:SetWidth(math.max(accept:GetFontString():GetStringWidth() + 24, 90))
+	cancel:SetWidth(math.max(cancel:GetFontString():GetStringWidth() + 24, 80))
+
+	accept:ClearAllPoints()
+	accept:SetPoint("LEFT", REAPPLY_PADDING, 0)
+	cancel:ClearAllPoints()
+	cancel:SetPoint("LEFT", accept, "RIGHT", REAPPLY_PADDING, 0)
+
+	reapplyPrompt:SetSize(
+		accept:GetWidth() + cancel:GetWidth() + REAPPLY_PADDING * 3,
+		REAPPLY_BUTTON_HEIGHT + REAPPLY_PADDING * 2
+	)
 	reapplyPrompt:ClearAllPoints()
 	reapplyPrompt:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 	reapplyPrompt:Show()
