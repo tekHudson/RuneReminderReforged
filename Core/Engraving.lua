@@ -107,12 +107,46 @@ end
 ----------------------------------------------------------------------
 
 -- Fresh query every time (no caching) so newly-learned runes show up
--- immediately without any extra event wiring.
+-- immediately without any extra event wiring -- no rebuild-on-learn needed,
+-- this just re-asks the server on every picker open.
+--
+-- Returns every rune defined for the slot's category (ownedOnly=false),
+-- each tagged with a `.known` flag (cross-referenced against the
+-- ownedOnly=true list by skillLineAbilityID) so the picker can render the
+-- full set and grey out whichever ones the player hasn't learned, instead
+-- of only ever showing learned runes (or a bare "none known" message).
 function RRR:GetRunesForSlot(slot)
 	local category = PAPERDOLL_TO_INVTYPE[slot] or slot
-	local runes = C_Engraving.GetRunesForCategory(category, true)
+
+	local owned = {}
+	for _, rune in ipairs(C_Engraving.GetRunesForCategory(category, true)) do
+		owned[rune.skillLineAbilityID] = true
+	end
+
+	local runes = C_Engraving.GetRunesForCategory(category, false)
+	for _, rune in ipairs(runes) do
+		rune.known = owned[rune.skillLineAbilityID] or false
+	end
 	table.sort(runes, function(a, b) return a.name < b.name end)
 	return runes
+end
+
+-- The client fetches a rune's full tooltip data (icon + description) lazily
+-- the first time something calls GameTooltip:SetEngravingRune for it -- if
+-- that first call happens on the player's own hover in the picker, the
+-- tooltip visibly "steps in" over the next moment as the data arrives.
+-- Warm the client's cache for every rune up front instead (known or not,
+-- across every tracked slot) using a tooltip that's never shown, so by the
+-- time the player actually hovers one it's already cached.
+local scanTooltip = CreateFrame("GameTooltip", "RuneReminderReforgedScanTooltip", UIParent, "GameTooltipTemplate")
+scanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+
+function RRR:WarmRuneTooltipCache()
+	for _, slot in ipairs(RRR.slots) do
+		for _, rune in ipairs(RRR:GetRunesForSlot(slot)) do
+			scanTooltip:SetEngravingRune(rune.skillLineAbilityID)
+		end
+	end
 end
 
 -- CastRune only selects the rune and enters "targeting mode" -- Blizzard's
@@ -199,8 +233,10 @@ end
 -- catches that case without needing to hook additional events.
 function RRR:PLAYER_ENTERING_WORLD()
 	RRR:RefreshAllRunes()
+	RRR:WarmRuneTooltipCache()
 	C_Timer.After(2, function()
 		RRR:RefreshAllRunes()
+		RRR:WarmRuneTooltipCache()
 	end)
 end
 

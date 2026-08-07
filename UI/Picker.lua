@@ -35,17 +35,39 @@ local function CreateFlyoutButton()
 	b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 	b:RegisterForClicks("LeftButtonUp")
 
-	b:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		-- Same call Blizzard's own EngravingFrame rune buttons use
-		-- (RuneSpellButton_OnEnter) -- gives name + full description, not just
-		-- the name we'd have to type out ourselves.
+	-- SetEngravingRune's underlying spell data (icon, full description) is
+	-- warmed into the client's cache well before this ever runs (see
+	-- Core/Engraving.lua:WarmRuneTooltipCache, called on entering world), so
+	-- this can just build the tooltip once per hover instead of needing to
+	-- repeatedly re-poll for data that might still be loading.
+	local function RefreshTooltip(self)
+		-- ANCHOR_RIGHT, matching Blizzard's own EngravingFrame rune buttons
+		-- (RuneSpellButton_OnEnter) -- keeps the tooltip clear of the flyout's
+		-- own icon stack instead of covering neighboring rune buttons.
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetEngravingRune(self.skillLineAbilityID)
+
 		if self.disabledReason then
+			-- Blizzard's own tooltip appends a bracketed action hint (e.g.
+			-- "<Click to Engrave Rune>") that's misleading here since the
+			-- button can't actually be clicked. That embedded ability
+			-- preview isn't a plain text line (ClearLines()+rebuild would
+			-- destroy it), so blank the hint line in place instead of
+			-- rebuilding the tooltip, then append our own reason below it.
+			for i = 1, GameTooltip:NumLines() do
+				local fontString = _G["GameTooltipTextLeft" .. i]
+				local text = fontString and fontString:GetText()
+				if text and text:match("^%s*<.*>%s*$") then
+					fontString:SetText("")
+				end
+			end
 			GameTooltip:AddLine(self.disabledReason, 1, 0.2, 0.2, true)
 		end
+
 		GameTooltip:Show()
-	end)
+	end
+
+	b:SetScript("OnEnter", RefreshTooltip)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 	return b
@@ -68,14 +90,15 @@ local function CreateFlyout()
 	bg:SetAllPoints()
 	bg:SetColorTexture(0, 0, 0, 0.5)
 
-	-- Shown instead of an icon row when the slot's category has no runes the
-	-- player currently knows (GetRunesForSlot's ownedOnly=true can legitimately
-	-- return an empty list, e.g. Head runes learned later than other slots'). A
-	-- flyout with zero icons and no background was otherwise indistinguishable
-	-- from nothing happening on click at all.
+	-- Shown instead of an icon row on the rare slot category with no rune
+	-- definitions at all (GetRunesForSlot now returns every rune for the
+	-- category, known or not, so this only fires for a genuinely empty
+	-- category -- not just "player hasn't learned any yet"). A flyout with
+	-- zero icons and no background was otherwise indistinguishable from
+	-- nothing happening on click at all.
 	f.emptyText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	f.emptyText:SetPoint("CENTER")
-	f.emptyText:SetText("No runes known for this slot")
+	f.emptyText:SetText("No runes exist for this slot")
 	f.emptyText:Hide()
 
 	f:Hide()
@@ -114,13 +137,20 @@ function RRR:OpenPicker(slot, anchorButton)
 			b = CreateFlyoutButton()
 			flyoutButtons[i] = b
 		end
+		local usable = engravable and rune.known
 		b.icon:SetTexture(rune.iconTexture)
-		b.icon:SetDesaturated(not engravable)
-		b:SetAlpha(engravable and 1 or 0.4)
+		b.icon:SetDesaturated(not usable)
+		b:SetAlpha(usable and 1 or 0.4)
 		b.skillLineAbilityID = rune.skillLineAbilityID
-		b.disabledReason = not engravable and "Can't engrave this slot right now." or nil
+		if not rune.known then
+			b.disabledReason = "You haven't learned this rune yet."
+		elseif not engravable then
+			b.disabledReason = "Can't engrave this slot right now."
+		else
+			b.disabledReason = nil
+		end
 		b:SetScript("OnClick", function()
-			if not engravable then
+			if not usable then
 				return
 			end
 			RRR:CastRuneOnSlot(rune, slot)
