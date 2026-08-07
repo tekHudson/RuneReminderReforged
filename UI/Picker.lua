@@ -41,6 +41,9 @@ local function CreateFlyoutButton()
 		-- (RuneSpellButton_OnEnter) -- gives name + full description, not just
 		-- the name we'd have to type out ourselves.
 		GameTooltip:SetEngravingRune(self.skillLineAbilityID)
+		if self.disabledReason then
+			GameTooltip:AddLine(self.disabledReason, 1, 0.2, 0.2, true)
+		end
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -89,6 +92,13 @@ function RRR:OpenPicker(slot, anchorButton)
 	local dir = DIRECTIONS[RRR.db.widget.flyoutDirection] or DIRECTIONS.UP
 	local step = ICON_SIZE + ICON_PADDING
 
+	-- Whether the item currently sitting in this slot can even be engraved
+	-- right now (empty slot, non-engravable item, etc.) -- if not, every
+	-- rune is equally inapplicable, so still render the full list (rather
+	-- than the flyout looking broken/empty) but grey it all out instead of
+	-- letting a click silently no-op.
+	local engravable = C_Engraving.IsEquipmentSlotEngravable(slot)
+
 	-- flyout is parented to UIParent (not the widget container), so it
 	-- doesn't inherit the widget's scale automatically -- match it here so
 	-- the flyout's icons stay visually proportional to the widget's own.
@@ -105,8 +115,14 @@ function RRR:OpenPicker(slot, anchorButton)
 			flyoutButtons[i] = b
 		end
 		b.icon:SetTexture(rune.iconTexture)
+		b.icon:SetDesaturated(not engravable)
+		b:SetAlpha(engravable and 1 or 0.4)
 		b.skillLineAbilityID = rune.skillLineAbilityID
+		b.disabledReason = not engravable and "Can't engrave this slot right now." or nil
 		b:SetScript("OnClick", function()
+			if not engravable then
+				return
+			end
 			RRR:CastRuneOnSlot(rune, slot)
 			HideFlyout()
 		end)
