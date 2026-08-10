@@ -168,12 +168,19 @@ end
 -- no separate title/icon taking up space. Styled with the classic dialog
 -- box background/border (same art Blizzard's own popups use) and anchored
 -- dead center on screen.
+--
+-- Swapping several pieces of gear at once (e.g. a full set change) can
+-- clear more than one tracked slot's rune in a single burst -- rather than
+-- the later ones silently clobbering the still-unanswered earlier one (only
+-- one dialog exists), extra prompts queue up and get shown one at a time as
+-- each is resolved (Accept, Cancel, or Escape).
 ----------------------------------------------------------------------
 
 local REAPPLY_PADDING = 14
 local REAPPLY_BUTTON_HEIGHT = 22
 
 local reapplyPrompt
+local reapplyQueue = {} -- FIFO of { slot, oldRune }, waiting behind whatever's currently shown
 
 local function CreateReapplyPrompt()
 	local p = CreateFrame("Frame", "RuneReminderReforgedReapplyPrompt", UIParent, "BackdropTemplate")
@@ -208,8 +215,18 @@ local function CreateReapplyPrompt()
 		p:Hide()
 	end)
 
-	-- Escape dismisses it too, same as any other WoW UI panel.
+	-- Escape dismisses it too, same as any other WoW UI panel. Whatever
+	-- closes this dialog -- Accept, Cancel, Escape, or a stale slot getting
+	-- hidden out from under it (RRR:HideReapplyPrompt) -- should surface
+	-- the next queued prompt, so handle that here once rather than in each
+	-- of those separate paths.
 	tinsert(UISpecialFrames, p:GetName())
+	p:SetScript("OnHide", function()
+		if #reapplyQueue > 0 then
+			local next = tremove(reapplyQueue, 1)
+			RRR:ShowReapplyPrompt(next.slot, next.oldRune)
+		end
+	end)
 
 	p:Hide()
 	return p
@@ -218,6 +235,11 @@ end
 function RRR:ShowReapplyPrompt(slot, oldRune)
 	if not reapplyPrompt then
 		reapplyPrompt = CreateReapplyPrompt()
+	end
+
+	if reapplyPrompt:IsShown() then
+		tinsert(reapplyQueue, { slot = slot, oldRune = oldRune })
+		return
 	end
 
 	reapplyPrompt.slot = slot
@@ -244,10 +266,16 @@ function RRR:ShowReapplyPrompt(slot, oldRune)
 	reapplyPrompt:Show()
 end
 
--- Dismisses a still-open prompt for `slot` -- called whenever that slot's
--- equipment changes again, so a stale "Reapply?" doesn't linger once the
--- rune is back (or the slot's moved on to something else entirely).
+-- Dismisses a still-open or still-queued prompt for `slot` -- called
+-- whenever that slot's equipment changes again, so a stale "Reapply?"
+-- doesn't linger (or later surface from the queue) once the rune is back
+-- (or the slot's moved on to something else entirely).
 function RRR:HideReapplyPrompt(slot)
+	for i = #reapplyQueue, 1, -1 do
+		if reapplyQueue[i].slot == slot then
+			tremove(reapplyQueue, i)
+		end
+	end
 	if reapplyPrompt and reapplyPrompt:IsShown() and reapplyPrompt.slot == slot then
 		reapplyPrompt:Hide()
 	end
