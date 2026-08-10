@@ -35,7 +35,8 @@ local DEFAULTS = {
 		labelOnHover    = true,         -- false = slot-name label always shown, not just on hover
 	},
 	notify = {
-		enabled = true,
+		enabled     = true,
+		castConfirm = true, -- chat message confirming a successful picker-cast rune replacement
 	},
 }
 

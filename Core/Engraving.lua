@@ -167,22 +167,30 @@ end
 function RRR:CastRuneOnSlot(rune, slot)
 	local oldRune = RRR.runeCache[slot]
 
+	-- Recorded before issuing the cast, not after -- ReplaceEnchant can fire
+	-- RUNE_UPDATED synchronously within this same call, before control ever
+	-- returns here. RUNE_UPDATED (below) only fires on an actual successful
+	-- engrave, so the confirmation print happens there instead of right
+	-- here -- CastRune/UseInventoryItem/ReplaceEnchant can all silently
+	-- no-op (empty slot, non-engravable item, out of range, etc.), and
+	-- printing "Replaced X with Y" unconditionally right after issuing the
+	-- request claimed success even when nothing actually happened.
+	if oldRune and oldRune.skillLineAbilityID ~= rune.skillLineAbilityID then
+		RRR.pendingReplace = { slot = slot, oldRune = oldRune, newRune = rune }
+	else
+		RRR.pendingReplace = nil
+	end
+
 	ClearCursor()
 	C_Engraving.CastRune(rune.skillLineAbilityID)
 	if slot then
 		UseInventoryItem(slot)
 	end
 	-- Auto-confirms the overwrite (see note above) with zero visual "are you
-	-- sure" -- print a record of what happened so a misclick in the picker
-	-- is at least visible after the fact.
+	-- sure".
 	C_Item.ReplaceEnchant()
 	StaticPopup_Hide("REPLACE_ENCHANT")
 	ClearCursor()
-
-	if oldRune and oldRune.skillLineAbilityID ~= rune.skillLineAbilityID then
-		RRR:Print(string.format("Replaced |cffffcc00%s|r with |cffffcc00%s|r on your %s.",
-			oldRune.name, rune.name, RRR:GetSlotDisplayName(slot)))
-	end
 end
 
 ----------------------------------------------------------------------
@@ -251,4 +259,17 @@ end
 -- Cheap (10 API calls), and RUNE_UPDATED only fires on an actual engrave.
 function RRR:RUNE_UPDATED(_, rune)
 	RRR:RefreshAllRunes()
+
+	-- Confirms (or discards) a pending CastRuneOnSlot replacement -- see the
+	-- comment there. Only prints once the slot's actual rune matches what
+	-- we asked for, i.e. the cast genuinely succeeded.
+	local pending = RRR.pendingReplace
+	if pending then
+		RRR.pendingReplace = nil
+		local actual = C_Engraving.GetRuneForEquipmentSlot(pending.slot)
+		if RRR.db.notify.castConfirm and actual and actual.skillLineAbilityID == pending.newRune.skillLineAbilityID then
+			RRR:Print(string.format("Replaced |cffffcc00%s|r with |cffffcc00%s|r on your %s.",
+				pending.oldRune.name, pending.newRune.name, RRR:GetSlotDisplayName(pending.slot)))
+		end
+	end
 end

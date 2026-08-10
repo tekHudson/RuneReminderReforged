@@ -122,6 +122,13 @@ local function BuildPage()
 	notifyCB:SetPoint("TOPLEFT", panel, "TOPLEFT", COL1, y)
 	y = y - ROW
 
+	local castConfirmCB = newCheckbox(panel, "Chat message on rune replacement",
+		"Print a chat message confirming a rune you engraved via the picker successfully replaced the slot's old rune.",
+		function() return RRR.db.notify.castConfirm end,
+		function(v) RRR.db.notify.castConfirm = v end)
+	castConfirmCB:SetPoint("TOPLEFT", panel, "TOPLEFT", COL1, y)
+	y = y - ROW
+
 	local labelHoverCB = newCheckbox(panel, "Text on hover",
 		"Show each slot's name only on mouseover. Unchecked, slot names are always shown.",
 		function() return RRR.db.widget.labelOnHover end,
