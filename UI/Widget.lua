@@ -57,9 +57,9 @@ local function CreateSlotButton(slot)
 	button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
 	button.slot = slot
 
-	local border = button:CreateTexture(nil, "BACKGROUND")
-	border:SetAllPoints()
-	border:SetColorTexture(0, 0, 0, 0.5)
+	button.border = button:CreateTexture(nil, "BACKGROUND")
+	button.border:SetAllPoints()
+	button.border:SetColorTexture(0, 0, 0, 0.5)
 
 	button.icon = button:CreateTexture(nil, "ARTWORK")
 	button.icon:SetPoint("TOPLEFT", 1, -1)
@@ -103,6 +103,9 @@ local function CreateSlotButton(slot)
 	return button
 end
 
+local BORDER_NEUTRAL = { 0, 0, 0, 0.5 }
+local BORDER_NEEDS_RUNE = { 0.8, 0.1, 0.1, 0.9 } -- gear equipped, slot engravable, no rune -- flag it
+
 function RRR:RefreshSlotButton(slot)
 	local button = buttons[slot]
 	if not button then
@@ -110,12 +113,28 @@ function RRR:RefreshSlotButton(slot)
 	end
 
 	local rune = RRR.runeCache[slot]
+	local itemTexture = GetInventoryItemTexture("player", slot)
+
 	if rune and rune.iconTexture then
 		button.icon:SetTexture(rune.iconTexture)
 		button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		button:SetAlpha(1)
+		button.border:SetColorTexture(unpack(BORDER_NEUTRAL))
+	elseif itemTexture then
+		-- Gear's on the slot but nothing's engraved -- show the gear itself
+		-- (not the generic empty-slot art) with a red border so it stands
+		-- out from slots that are merely empty of gear entirely.
+		button.icon:SetTexture(itemTexture)
+		button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		button:SetAlpha(1)
+		button.border:SetColorTexture(unpack(BORDER_NEEDS_RUNE))
 	else
+		-- No gear at all in this slot -- dim it so an empty slot recedes
+		-- instead of looking like an active one needing attention.
 		button.icon:SetTexture(EMPTY_SLOT_TEXTURE)
 		button.icon:SetTexCoord(0, 1, 0, 1)
+		button:SetAlpha(0.35)
+		button.border:SetColorTexture(unpack(BORDER_NEUTRAL))
 	end
 
 	local start, duration, enable = GetInventoryItemCooldown("player", slot)
